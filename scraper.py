@@ -155,16 +155,17 @@ def fetch(url: str, delay: float = 0.0) -> Optional[BeautifulSoup]:
 def work_profile(page_dir: Path, profile_index: int, profile_link: str) -> None:
     # check if already done
     file_path = page_dir / (str(profile_index) + ".json")
-    with file_path.open("r") as file:
-        content: dict[str, str] = json.load(file)
-        error = False
-        for key in KEYS:
-            if key not in content:
-                error = True
-                break
-        if not error:
-            logger.info("already done")
-            return
+    if file_path.is_file():
+        with file_path.open("r") as file:
+            content: dict[str, str] = json.load(file)
+            error = False
+            for key in KEYS:
+                if key not in content:
+                    error = True
+                    break
+            if not error:
+                logger.info("already done")
+                return
 
     # fetch profile content
     profile_content = fetch(profile_link)
