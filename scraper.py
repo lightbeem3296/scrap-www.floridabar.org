@@ -1,3 +1,4 @@
+import argparse
 import json
 import time
 from http import HTTPStatus
@@ -18,6 +19,32 @@ DONE_MARKER_NAME = "done"
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0"
 HTTP_TIME_OUT = 15.0
 PAGE_SIZE = 10
+
+KEYS = [
+    "profile_name",
+    "profile_url",
+    "profile_image_url",
+    "bar_number",
+    "law_firm_name",
+    "street_address_1",
+    "street_address_2",
+    "city",
+    "state",
+    "zip",
+    "county",
+    "admitted",
+    "ten_year_disc",
+    "law_school",
+    "sections",
+    "practice_areas",
+    "firm_size",
+    "firm_position",
+    "languages",
+    "firm_website",
+    "office",
+    "cell",
+    "email",
+]
 
 SEARCH_LIST = [
     "https://www.floridabar.org/directories/find-mbr/?locType=C&locValue=Jacksonville&sdx=N&eligible=Y&deceased=N&pageNumber=1&pageSize=10",
@@ -126,33 +153,25 @@ def fetch(url: str, delay: float = 0.0) -> Optional[BeautifulSoup]:
 
 
 def work_profile(page_dir: Path, profile_index: int, profile_link: str) -> None:
+    # check if already done
+    file_path = page_dir / (str(profile_index) + ".json")
+    with file_path.open("r") as file:
+        content: dict[str, str] = json.load(file)
+        error = False
+        for key in KEYS:
+            if key not in content:
+                error = True
+                break
+        if not error:
+            logger.info("already done")
+            return
+
+    # fetch profile content
     profile_content = fetch(profile_link)
 
-    profile = {
-        "profile_name": "",
-        "profile_url": "",
-        "profile_image_url": "",
-        "bar_number": "",
-        "law_firm_name": "",
-        "street_address_1": "",
-        "street_address_2": "",
-        "city": "",
-        "state": "",
-        "zip": "",
-        "county": "",
-        "admitted": "",
-        "ten_year_disc": "",
-        "law_school": "",
-        "sections": "",
-        "practice_areas": "",
-        "firm_size": "",
-        "firm_position": "",
-        "languages": "",
-        "firm_website": "",
-        "office": "",
-        "cell": "",
-        "email": "",
-    }
+    profile: dict[str, str] = {}
+    for key in KEYS:
+        profile[key] = ""
 
     # Profile Name
     profile_name_elem = profile_content.select_one("h1.full")
@@ -269,7 +288,6 @@ def work_profile(page_dir: Path, profile_index: int, profile_link: str) -> None:
             profile["email"] = value_elem.text
 
     # save profile information
-    file_path = page_dir / (str(profile_index) + ".json")
     with file_path.open("w") as file:
         json.dump(profile, file, indent=2, default=str)
 
@@ -350,13 +368,28 @@ def test():
         0,
         "https://www.floridabar.org/directories/find-mbr/profile/?num=349623",
     )
+    work_profile(
+        OUT_DIR,
+        1,
+        "https://www.floridabar.org/directories/find-mbr/profile/?num=91287",
+    )
 
 
 def main():
-    for search_link in SEARCH_LIST:
-        work_location_link(search_link)
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-i",
+        "--index",
+        type=int,
+        required=True,
+        help="Search URL index: 0~38",
+    )
+    args = parser.parse_args()
+
+    index = int(args.index)
+    work_location_link(SEARCH_LIST[index])
 
 
 if __name__ == "__main__":
-    # main()
-    test()
+    main()
+    # test()
