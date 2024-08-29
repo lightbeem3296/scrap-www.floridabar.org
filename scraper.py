@@ -2,19 +2,22 @@ import argparse
 import json
 import time
 from http import HTTPStatus
+from pathlib import Path
 from typing import Optional
 from urllib.parse import parse_qs, urlparse
 
 import requests
+import urllib3
 from bs4 import BeautifulSoup
 from loguru import logger
 
-from pathlib import Path
+urllib3.disable_warnings()
 
 CUR_DIR = Path(__file__).parent
 OUT_DIR = CUR_DIR / "output"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
+BASE_URL = "https://www.floridabar.org"
 DONE_MARKER_NAME = "done"
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0"
 HTTP_TIME_OUT = 15.0
@@ -129,6 +132,10 @@ def normalize_str(text: str) -> str:
 
 def fetch(url: str, delay: float = 0.0) -> Optional[BeautifulSoup]:
     ret = None
+
+    if not url.startswith(BASE_URL):
+        url = BASE_URL + url
+
     while True:
         try:
             session = requests.Session()
@@ -331,7 +338,7 @@ def work_location_link(loc_link: str) -> None:
     if search_result is not None:
         res_msg_elem = search_result.select_one("p.result-message")
         if res_msg_elem is not None:
-            total_items = int(res_msg_elem.text.strip().split(" ")[-2])
+            total_items = int(res_msg_elem.text.strip().split(" ")[-2].replace(",", ""))
             total_pages = (total_items + PAGE_SIZE - 1) // PAGE_SIZE
             logger.info(f"total_items: {total_items}, total_pages: {total_pages}")
 
@@ -382,7 +389,8 @@ def main():
         "-i",
         "--index",
         type=int,
-        required=True,
+        required=False,
+        default=0,
         help="Search URL index: 0~38",
     )
     args = parser.parse_args()
