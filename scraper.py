@@ -403,7 +403,7 @@ def main():
     index = int(args.index)
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(headless=False)
         PAGE = browser.new_page()
         work_location_link(loc_index=index, loc_link=SEARCH_LIST[index])
         browser.close()
