@@ -139,19 +139,20 @@ def fetch(url: str, referer: str = "", delay: float = 0.0) -> Optional[Beautiful
         try:
             time.sleep(delay)
 
-            PAGE.goto(url=url, referer=referer, wait_until="networkidle")
-            if PAGE.query_selector("a.logoHeader") is not None:
+            resp = PAGE.goto(url=url, referer=referer, wait_until="networkidle")
+
+            if resp is None:
+                logger.error("response is none")
+                continue
+
+            if PAGE.query_selector("a.logoHeader") is None:
+                time.sleep(1)
+            else:
                 ret = BeautifulSoup(PAGE.content(), "html.parser")
                 break
-            else:
-                logger.warning("page not loaded")
+            if ret is not None:
+                break
 
-                PAGE.context.clear_cookies()
-
-                PAGE.evaluate("localStorage.clear()")
-                PAGE.evaluate("sessionStorage.clear()")
-
-                time.sleep(5)
         except Exception as ex:
             logger.exception(ex)
     return ret
