@@ -223,8 +223,10 @@ def work_profile(
                 else:
                     html = paragraph_elem.decode_contents()
                     lines = html.split("<br/>")
+
                     # Street Address 1
-                    profile["street_address_1"] = lines[1].strip()
+                    if len(lines) >= 2:
+                        profile["street_address_1"] = lines[1].strip()
 
                     # Street Address 2
                     if len(lines) >= 4:
