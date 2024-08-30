@@ -3,7 +3,7 @@ import json
 import time
 from pathlib import Path
 from typing import Optional
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from bs4 import BeautifulSoup
 from loguru import logger
@@ -299,15 +299,14 @@ def work_profile(
         json.dump(profile, file, indent=2, default=str)
 
 
-def work_page(loc_dir: Path, page_index: int, page_link: str) -> BeautifulSoup:
-    page_content = fetch(page_link)
-
+def work_page(loc_dir: Path, page_index: int, page_link: str) -> None:
     page_dir = loc_dir / str(page_index)
     page_dir.mkdir(parents=True, exist_ok=True)
 
     if is_done(page_dir):
         logger.info("already done")
     else:
+        page_content = fetch(page_link)
         items = page_content.select("li.profile-compact")
         for i, item in enumerate(items):
             profile_link_elem = item.select_one("a")
@@ -323,8 +322,6 @@ def work_page(loc_dir: Path, page_index: int, page_link: str) -> BeautifulSoup:
             )
 
         mark_as_done(page_dir)
-
-    return page_content
 
 
 def work_location_link(loc_index: int, loc_link: str) -> None:
@@ -346,26 +343,27 @@ def work_location_link(loc_index: int, loc_link: str) -> None:
             total_pages = (total_items + PAGE_SIZE - 1) // PAGE_SIZE
             logger.info(f"total_items: {total_items}, total_pages: {total_pages}")
 
-            page_link = loc_link
-
             for page_index in range(total_pages):
-                logger.info(f"page_index: {page_index} / {total_pages}")
+                query_params["pageNumber"] = str(page_index + 1)
+                new_query_string = urlencode(query_params, doseq=True)
+                page_link = urlunparse(
+                    (
+                        parsed_url.scheme,
+                        parsed_url.netloc,
+                        parsed_url.path,
+                        parsed_url.params,
+                        new_query_string,
+                        parsed_url.fragment,
+                    )
+                )
 
-                page_content = work_page(
+                logger.info(f"page_index: {page_index} / {total_pages} >> {page_link}")
+
+                work_page(
                     loc_dir=loc_dir,
                     page_index=page_index,
                     page_link=page_link,
                 )
-
-                # go to next page
-                if page_index < total_pages - 1:
-                    next_page_link_item = page_content.select_one(
-                        "a[title='next page']"
-                    )
-                    next_page_link = next_page_link_item.attrs["href"]
-                    logger.info(f"next_page_link: {next_page_link}")
-
-                    page_link = next_page_link
 
             mark_as_done(loc_dir)
         else:
