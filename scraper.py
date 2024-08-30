@@ -126,7 +126,7 @@ def normalize_str(text: str) -> str:
     return ret
 
 
-def fetch(url: str, referer: str = "", delay: float = 3.0) -> Optional[BeautifulSoup]:
+def fetch(url: str, referer: str = "", delay: float = 0.0) -> Optional[BeautifulSoup]:
     ret = None
 
     if not url.startswith(BASE_URL):
@@ -144,13 +144,14 @@ def fetch(url: str, referer: str = "", delay: float = 3.0) -> Optional[Beautiful
                 ret = BeautifulSoup(PAGE.content(), "html.parser")
                 break
             else:
-                # Clear cookies
+                logger.warning("page not loaded")
+
                 PAGE.context.clear_cookies()
 
-                # Clear local storage and session storage
                 PAGE.evaluate("localStorage.clear()")
                 PAGE.evaluate("sessionStorage.clear()")
-                time.sleep(10)
+
+                time.sleep(5)
         except Exception as ex:
             logger.exception(ex)
     return ret
@@ -402,7 +403,7 @@ def main():
     index = int(args.index)
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=True)
         PAGE = browser.new_page()
         work_location_link(loc_index=index, loc_link=SEARCH_LIST[index])
         browser.close()
