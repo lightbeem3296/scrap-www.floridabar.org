@@ -5,13 +5,9 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import parse_qs, urlparse
 
-import urllib3
 from bs4 import BeautifulSoup
 from loguru import logger
 from playwright.sync_api import sync_playwright
-
-urllib3.disable_warnings()
-
 
 CUR_DIR = Path(__file__).parent
 OUT_DIR = CUR_DIR / "output"
@@ -130,7 +126,7 @@ def normalize_str(text: str) -> str:
     return ret
 
 
-def fetch(url: str, referer: str = "", delay: float = 0.0) -> Optional[BeautifulSoup]:
+def fetch(url: str, referer: str = "", delay: float = 3.0) -> Optional[BeautifulSoup]:
     ret = None
 
     if not url.startswith(BASE_URL):
@@ -148,7 +144,13 @@ def fetch(url: str, referer: str = "", delay: float = 0.0) -> Optional[Beautiful
                 ret = BeautifulSoup(PAGE.content(), "html.parser")
                 break
             else:
-                time.sleep(60)
+                # Clear cookies
+                PAGE.context.clear_cookies()
+
+                # Clear local storage and session storage
+                PAGE.evaluate("localStorage.clear()")
+                PAGE.evaluate("sessionStorage.clear()")
+                time.sleep(10)
         except Exception as ex:
             logger.exception(ex)
     return ret
