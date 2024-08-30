@@ -1,20 +1,14 @@
 import argparse
 import json
-import os
-import shutil
 import time
-from http import HTTPStatus
 from pathlib import Path
-from random import randint
 from typing import Optional
 from urllib.parse import parse_qs, urlparse
 
-import requests
 import urllib3
 from bs4 import BeautifulSoup
 from loguru import logger
-
-from libchrome import Chrome
+from playwright.sync_api import sync_playwright
 
 urllib3.disable_warnings()
 
@@ -24,14 +18,9 @@ OUT_DIR = CUR_DIR / "output"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 BASE_URL = "https://www.floridabar.org"
-COOKIE = ""
-COOKIE_DOMAIN = ".floridabar.org"
-CHROME = None
-USER_DATA_DIR = CUR_DIR / "temp" / "profile"
+PAGE = None
 
 DONE_MARKER_NAME = "done"
-USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0"
-HTTP_TIME_OUT = 15.0
 PAGE_SIZE = 10
 
 KEYS = [
@@ -141,106 +130,25 @@ def normalize_str(text: str) -> str:
     return ret
 
 
-def get_cookie(url: str, wait_elem_selector: str) -> Optional[str]:
-    global CHROME
-
-    cookie_header = None
-    if CHROME is not None:
-        CHROME.run_script("localStorage.clear(); sessionStorage.clear();")
-        CHROME.clear_cookie()
-
-        fails = 0
-        while not CHROME.goto(
-            url2go=url,
-            wait_elem_selector=wait_elem_selector,
-            wait_timeout=30.0,
-        ):
-            CHROME.run_script("localStorage.clear(); sessionStorage.clear();")
-            CHROME.clear_cookie()
-            fails += 1
-            if fails == 2:
-                fails = 0
-
-                left = CHROME.run_script("window.screenLeft")
-                top = CHROME.run_script("window.screenTop")
-                width = CHROME.run_script("window.outerWidth")
-                height = CHROME.run_script("window.outerHeight")
-                CHROME.quit()
-
-                while os.path.isdir(USER_DATA_DIR):
-                    try:
-                        shutil.rmtree(USER_DATA_DIR)
-                    except Exception as ex:
-                        logger.exception(ex)
-                    time.sleep(0.1)
-
-                CHROME = Chrome(
-                    left=left,
-                    top=top,
-                    width=width,
-                    height=height,
-                    user_data_dir=USER_DATA_DIR,
-                )
-                CHROME.start()
-
-        while True:
-            cookies = CHROME.cookie(COOKIE_DOMAIN)
-            if cookies is not None:
-                cookie_header = ""
-                for cookie in cookies:
-                    cookie_header += f"{cookie['name']}={cookie['value']}; "
-                cookie_header = cookie_header.strip().rstrip(";")
-
-                if cookie_header == "":
-                    time.sleep(5)
-                else:
-                    break
-            else:
-                logger.error("Cookie is none")
-    else:
-        logger.error("chrome is None")
-    return cookie_header
-
-
 def fetch(url: str, referer: str = "", delay: float = 0.0) -> Optional[BeautifulSoup]:
-    global COOKIE
-
     ret = None
 
     if not url.startswith(BASE_URL):
         url = BASE_URL + url
 
+    if not referer.startswith(BASE_URL):
+        referer = BASE_URL + referer
+
     while True:
         try:
             time.sleep(delay)
 
-            user_agent = CHROME.run_script("navigator.userAgent")
-            resp = requests.get(
-                url,
-                headers={
-                    "Cookie": COOKIE,
-                    "User-Agent": user_agent,
-                    "Referer": referer,
-                },
-                verify=False,
-                timeout=HTTP_TIME_OUT,
-            )
-
-            if resp.status_code == HTTPStatus.OK:
-                ret = BeautifulSoup(resp.text, "html.parser")
+            PAGE.goto(url=url, referer=referer, wait_until="networkidle")
+            if PAGE.query_selector("a.logoHeader") is not None:
+                ret = BeautifulSoup(PAGE.content(), "html.parser")
                 break
-            # elif resp.status_code == HTTPStatus.TOO_MANY_REQUESTS:
-            #     soap = BeautifulSoup(resp.text, "html.parser")
-            #     break
             else:
-                logger.error(f"request error: {resp.status_code}")
-
-            logger.info("fetch new cookie")
-            COOKIE = get_cookie(
-                url=url,
-                wait_elem_selector="a.logoHeader",
-            )
-            logger.info(f"cookie > {COOKIE}")
+                time.sleep(60)
         except Exception as ex:
             logger.exception(ex)
     return ret
@@ -382,7 +290,7 @@ def work_profile(
 
         # Email
         if name == "Email:":
-            profile["email"] = value_elem.text
+            profile["email"] = value
 
     # save profile information
     with file_path.open("w") as file:
@@ -478,7 +386,7 @@ def test():
 
 
 def main():
-    global CHROME, USER_DATA_DIR
+    global PAGE
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -493,15 +401,12 @@ def main():
 
     index = int(args.index)
 
-    CHROME = Chrome(
-        width=800 + randint(0, 200),
-        height=600 + randint(0, 100),
-        user_data_dir=str(USER_DATA_DIR.absolute()),
-    )
-    CHROME.start()
-    work_location_link(loc_index=index, loc_link=SEARCH_LIST[index])
-    CHROME.quit()
-    logger.info("all done")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)
+        PAGE = browser.new_page()
+        work_location_link(loc_index=index, loc_link=SEARCH_LIST[index])
+        browser.close()
+        logger.info("all done")
 
 
 if __name__ == "__main__":
