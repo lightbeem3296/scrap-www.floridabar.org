@@ -67,7 +67,22 @@ def merge(src_dpath: str):
                     print(f"[*] filepath: {fpath[len(src_dpath):]}")
 
                     with open(fpath, mode="r") as f:
-                        info = json.load(f)
+                        info: dict[str, str] = json.load(f)
+                        info["practice_areas"] = (
+                            info["practice_areas"]
+                            .replace("\r", "\n")
+                            .replace("\n", ":")
+                        )
+                        info["sections"] = (
+                            info["sections"]
+                            .replace("\r", "\n")
+                            .replace("\n", ":")
+                        )
+                        info["languages"] = (
+                            info["languages"]
+                            .replace("\r", "\n")
+                            .replace("\n", ":")
+                        )
                         res0_df = pd.concat(
                             [res0_df, pd.DataFrame([info])],
                             ignore_index=True,
