@@ -164,16 +164,20 @@ def work_profile(
     # check if already done
     file_path = page_dir / (str(profile_index) + ".json")
     if file_path.is_file():
-        with file_path.open("r") as file:
-            content: dict[str, str] = json.load(file)
-            error = False
-            for key in KEYS:
-                if key not in content:
-                    error = True
-                    break
-            if not error:
-                logger.info("already done")
-                return
+        try:
+            with file_path.open("r") as file:
+                content: dict[str, str] = json.load(file)
+                error = False
+                for key in KEYS:
+                    if key not in content:
+                        error = True
+                        break
+                if not error:
+                    logger.info("already done")
+                    return
+        except Exception as ex:
+            logger.exception(ex)
+            file_path.unlink()
 
     # fetch profile content
     profile_content = fetch(profile_link, referer=page_link)
