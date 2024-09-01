@@ -332,7 +332,12 @@ def work_page(loc_dir: Path, page_index: int, page_link: str) -> None:
         mark_as_done(page_dir)
 
 
-def work_location_link(loc_index: int, loc_link: str) -> None:
+def work_location_link(
+    loc_index: int,
+    loc_link: str,
+    page_min: int = 1,
+    page_max: int = None,
+) -> None:
     parsed_url = urlparse(loc_link)
     query_params = parse_qs(parsed_url.query)
     loc_value = query_params.get("locValue", [None])[0]
@@ -351,7 +356,10 @@ def work_location_link(loc_index: int, loc_link: str) -> None:
             total_pages = (total_items + PAGE_SIZE - 1) // PAGE_SIZE
             logger.info(f"total_items: {total_items}, total_pages: {total_pages}")
 
-            for page_index in range(total_pages):
+            if page_max is None or page_max > total_pages:
+                page_max = total_pages
+
+            for page_index in range(page_min - 1, page_max):
                 query_params["pageNumber"] = str(page_index + 1)
                 new_query_string = urlencode(query_params, doseq=True)
                 page_link = urlunparse(
@@ -405,14 +413,34 @@ def main():
         default=0,
         help="Search URL index: 0~38",
     )
+    parser.add_argument(
+        "--page_min",
+        type=int,
+        required=False,
+        default=1,
+        help="Minimum page number to process (default is 1).",
+    )
+    parser.add_argument(
+        "--page_max",
+        type=int,
+        required=False,
+        help="Maximum page number to process (default is all pages).",
+    )
     args = parser.parse_args()
 
     index = int(args.index)
+    page_min = int(args.page_min)
+    page_max = int(args.page_max) if args.page_max is not None else None
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=False)
         PAGE = browser.new_page()
-        work_location_link(loc_index=index, loc_link=SEARCH_LIST[index])
+        work_location_link(
+            loc_index=index,
+            loc_link=SEARCH_LIST[index],
+            page_min=page_min,
+            page_max=page_max,
+        )
         browser.close()
         logger.info("all done")
 
