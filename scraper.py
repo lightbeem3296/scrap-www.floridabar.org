@@ -320,7 +320,7 @@ def work_page(loc_dir: Path, page_index: int, page_link: str) -> None:
             profile_link_elem = item.select_one("a")
             profile_link = profile_link_elem.attrs["href"]
 
-            logger.info(f"profile: {i}/{len(items)} >> {profile_link}")
+            logger.info(f"profile: {i}/{len(items)}")
 
             work_profile(
                 page_dir=page_dir,
@@ -335,8 +335,8 @@ def work_page(loc_dir: Path, page_index: int, page_link: str) -> None:
 def work_location_link(
     loc_index: int,
     loc_link: str,
-    page_min: int = 1,
-    page_max: int = None,
+    page_min: int,
+    page_max: int,
 ) -> None:
     parsed_url = urlparse(loc_link)
     query_params = parse_qs(parsed_url.query)
@@ -359,7 +359,7 @@ def work_location_link(
             if page_max is None or page_max > total_pages:
                 page_max = total_pages
 
-            for page_index in range(page_min - 1, page_max):
+            for page_index in range(page_min, page_max):
                 query_params["pageNumber"] = str(page_index + 1)
                 new_query_string = urlencode(query_params, doseq=True)
                 page_link = urlunparse(
@@ -373,7 +373,7 @@ def work_location_link(
                     )
                 )
 
-                logger.info(f"page_index: {page_index} / {total_pages} >> {page_link}")
+                logger.info(f"page_index: {page_index} / ({page_min},{page_max})")
 
                 work_page(
                     loc_dir=loc_dir,
@@ -417,8 +417,8 @@ def main():
         "--page_min",
         type=int,
         required=False,
-        default=1,
-        help="Minimum page number to process (default is 1).",
+        default=0,
+        help="Minimum page number to process (default is 0).",
     )
     parser.add_argument(
         "--page_max",
